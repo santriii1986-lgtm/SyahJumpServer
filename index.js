@@ -114,6 +114,10 @@ wss.on("connection", (ws) => {
                 playerId: player.id
             });
 
+            if (room.players.size >= 2) {
+                room.started = true;
+            }
+
             broadcastRoomState(room);
             return;
         }
@@ -168,6 +172,23 @@ wss.on("connection", (ws) => {
                 alive: player.alive
             });
 
+            const alivePlayers = Array.from(room.players.values())
+                .filter(p => p.alive);
+
+            if (player.lives <= 0 && alivePlayers.length <= 1) {
+                const winner = alivePlayers.length === 1
+                    ? alivePlayers[0]
+                    : null;
+
+                broadcast(room, {
+                    type: "match_result",
+                    winnerId: winner ? winner.id : "",
+                    loserId: player.id
+                });
+
+                room.started = false;
+            }
+
             return;
         }
 
@@ -214,6 +235,16 @@ wss.on("connection", (ws) => {
         if (!room) return;
 
         room.players.delete(player.id);
+
+        if (room.players.size < 2) {
+            room.started = false;
+
+            for (const remaining of room.players.values()) {
+                remaining.lives = 3;
+                remaining.alive = true;
+                remaining.score = 0;
+            }
+        }
 
         broadcastRoomState(room);
 
